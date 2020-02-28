@@ -300,18 +300,22 @@ public class SpringApplication {
 		StopWatch stopWatch = new StopWatch();
 		stopWatch.start();
 		ConfigurableApplicationContext context = null;
+		// 异常收集列表
 		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+		// 设置jdk系统属性java.awt.headless，默认情况为true即开启；更多java.awt.headless信息大家可以去查阅资料，这不是本文重点
 		configureHeadlessProperty();
 		// 获取监听器, 默认五个
 		SpringApplicationRunListeners listeners = getRunListeners(args);
 		listeners.starting();
 		try {
-			// 将命令行参数读取
+			// 读取命令行参数
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
 			// 准备环境
+			// 准备环境：1、加载外部化配置的资源到environment；2、触发ApplicationEnvironmentPreparedEvent事件
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
 			configureIgnoreBeanInfo(environment);
 			Banner printedBanner = printBanner(environment);
+			// 创建应用上下文
 			context = createApplicationContext();
 			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
 					new Class[] { ConfigurableApplicationContext.class }, context);
@@ -343,10 +347,15 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+		// 获取 或者创建环境对象
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
+
+		// 配置PropertySources & 配置Profiles
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
+		// 监听器环境准备
 		listeners.environmentPrepared(environment);
+		// 环境信息和springboot应用绑定
 		bindToSpringApplication(environment);
 		if (!this.isCustomEnvironment) {
 			environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
@@ -369,10 +378,15 @@ public class SpringApplication {
 
 	private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
 			SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
+		// 配置上下文
 		context.setEnvironment(environment);
+		// 上下文后应用
 		postProcessApplicationContext(context);
+		// initializer 启动
 		applyInitializers(context);
+		// listeners 阶段性方法调用
 		listeners.contextPrepared(context);
+		// 打印日志
 		if (this.logStartupInfo) {
 			logStartupInfo(context.getParent() == null);
 			logStartupProfileInfo(context);
@@ -391,9 +405,12 @@ public class SpringApplication {
 			context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
 		}
 		// Load the sources
+		// 获取全部资源，其实就一个：SpringApplication的primarySources属性
 		Set<Object> sources = getAllSources();
 		Assert.notEmpty(sources, "Sources must not be empty");
+		//
 		load(context, sources.toArray(new Object[0]));
+		// listeners 阶段性方法调用
 		listeners.contextLoaded(context);
 	}
 
@@ -495,9 +512,11 @@ public class SpringApplication {
 	 */
 	protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
 		MutablePropertySources sources = environment.getPropertySources();
+		// 此时defaultProperties还是null，可能后续过程会初始化，具体详情请期待后续的博文
 		if (this.defaultProperties != null && !this.defaultProperties.isEmpty()) {
 			sources.addLast(new MapPropertySource("defaultProperties", this.defaultProperties));
 		}
+		// 存在命令行参数，则解析它并封装进SimpleCommandLinePropertySource对象，同时将此对象放到sources的第一位置（优先级最高）
 		if (this.addCommandLineProperties && args.length > 0) {
 			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 			if (sources.contains(name)) {
@@ -509,6 +528,7 @@ public class SpringApplication {
 				sources.replace(name, composite);
 			}
 			else {
+				// 将其放到第一位置
 				sources.addFirst(new SimpleCommandLinePropertySource(args));
 			}
 		}
@@ -524,7 +544,12 @@ public class SpringApplication {
 	 * @see org.springframework.boot.context.config.ConfigFileApplicationListener
 	 */
 	protected void configureProfiles(ConfigurableEnvironment environment, String[] args) {
+		// But these ones should go first (last wins in a property key clash)
+		// 如果存在其他的Profiles，则将这些Profiles放到第一的位置。此时没有，后面有没有后面再说
 		Set<String> profiles = new LinkedHashSet<>(this.additionalProfiles);
+
+		// 保证environment的activeProfiles属性被初始化了。从PropertySources中查找spring.profiles.active属性
+		// 存在则将其值添加activeProfiles集合中。我们可以通过命令行参数指定该参数，但我们没有指定
 		profiles.addAll(Arrays.asList(environment.getActiveProfiles()));
 		environment.setActiveProfiles(StringUtils.toStringArray(profiles));
 	}
