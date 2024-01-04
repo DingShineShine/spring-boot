@@ -311,7 +311,7 @@ public class SpringApplication {
 			// 读取命令行参数
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
 			// 准备环境
-			// 准备环境：1、加载外部化配置的资源到environment；2、触发ApplicationEnvironmentPreparedEvent事件
+			// 准备环境：1、**加载外部化 profile application 配置文件 配置的资源到environment；2、触发ApplicationEnvironmentPreparedEvent事件
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
 			configureIgnoreBeanInfo(environment);
 			Banner printedBanner = printBanner(environment);
@@ -319,6 +319,7 @@ public class SpringApplication {
 			context = createApplicationContext();
 			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
 					new Class[] { ConfigurableApplicationContext.class }, context);
+			// 将主类 构造成BeanDefinition 注册到 applicationContext中
 			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
 			refreshContext(context);
 			afterRefresh(context, applicationArguments);
@@ -408,7 +409,7 @@ public class SpringApplication {
 		// 获取全部资源，其实就一个：SpringApplication的primarySources属性
 		Set<Object> sources = getAllSources();
 		Assert.notEmpty(sources, "Sources must not be empty");
-		//
+		// 注册main方法所在类到beanFactory
 		load(context, sources.toArray(new Object[0]));
 		// listeners 阶段性方法调用
 		listeners.contextLoaded(context);
@@ -784,6 +785,17 @@ public class SpringApplication {
 	 * @param applicationContext the application context to refresh
 	 */
 	protected void refresh(ConfigurableApplicationContext applicationContext) {
+		// Allows post-processing of the bean factory in context subclasses.
+		// doScan(packages) : 扫描得到所有的BeanDefinition
+		//		postProcessBeanFactory(beanFactory);
+
+		// Invoke factory processors registered as beans in the context.
+		// 填充BeanDefinition的一些属性信息
+		//		invokeBeanFactoryPostProcessors(beanFactory);
+
+		// Instantiate all remaining (non-lazy-init) singletons.
+		// 最终实例化对象
+		//		finishBeanFactoryInitialization(beanFactory);
 		applicationContext.refresh();
 	}
 
